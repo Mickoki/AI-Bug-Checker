@@ -1,0 +1,162 @@
+# Agent Orchestration Framework Configuration
+# Based on requirements: LangGraph + CrewAI, local LLM, Kazakhstan data residency
+
+framework:
+  name: "Kazakhstan Security Agent System"
+  version: "1.0.0"
+  build_date: "2026-04-13"
+
+orchestration:
+  primary: "langgraph"  # LangGraph for complex workflows
+  secondary: "crewai"   # CrewAI as high-level facade
+  persistence:
+    type: "postgresql"  # or "sqlite" for dev
+    connection:
+      host: "${DB_HOST:localhost}"
+      port: 5432
+      database: "agent_state"
+      user: "${DB_USER}"
+      password: "${DB_PASSWORD}"
+    checkpoint_interval: 60  # seconds
+
+agents:
+  code_scanner:
+    role: "Security Code Scanner"
+    goal: "Analyze code for vulnerabilities, PDn violations, crypto compliance"
+    tools:
+      - semgrep
+      - codeql
+      - bandit
+      - llm_review
+    max_retries: 3
+    timeout: 300
+
+  knowledge_manager:
+    role: "Knowledge Base Manager"
+    goal: "Maintain and query regulatory documents, laws, standards"
+    tools:
+      - pgvector_search
+      - hybrid_search
+    max_retries: 2
+
+  compliance_auditor:
+    role: "Compliance Auditor"
+    goal: "Verify code against Kazakhstan regulations and KNB standards"
+    tools:
+      - knowledge_base
+      - llm_review
+
+llm:
+  # Local deployment only - NO external APIs
+  provider: "local"
+  
+  # Lightweight models for 8GB RAM limit:
+  # - qwen2.5-3b-instruct: ~6GB RAM (recommended)
+  # - qwen2.5-1.5b-instruct: ~3GB RAM
+  # - phi3.5-mini-instruct: ~4GB RAM
+  # - llama3.2-1b: ~2GB RAM
+  # - gemma-2-2b-it: ~4GB RAM
+  model: "${LLM_MODEL:qwen2.5-3b-instruct}"
+  
+  # Endpoint for local inference (Ollama, llama.cpp, or vLLM)
+  endpoint: "${LLM_ENDPOINT:http://localhost:11434/api/chat}"
+  
+  # Generation parameters
+  parameters:
+    temperature: 0.1  # Low for security/compliance tasks
+    max_tokens: 4096
+    top_p: 0.95
+  
+  # Monitoring
+  monitoring:
+    track_tokens: true
+    track_cost: true
+    alerts:
+      - high_token_usage
+      - model_errors
+
+  # Security - all requests MUST stay in Kazakhstan
+  data_residency:
+    required: true
+    allowed_regions: ["KZ"]
+    prohibited_providers:
+      - openai
+      - anthropic
+      - grok
+      - deepseek
+
+knowledge_base:
+  database:
+    type: "postgresql"
+    host: "${KB_DB_HOST:localhost}"
+    port: 5432
+    database: "knowledge_base"
+    
+  vector_store:
+    type: "pgvector"
+    dimension: 1536  # depends on embedding model
+    
+  indexing:
+    chunk_size: 1024
+    chunk_overlap: 128
+    metadata_fields:
+      - law_number
+      - effective_date
+      - category
+      - authority
+      
+  update_schedule:
+    enabled: true
+    interval: "daily"  # or "weekly"
+    sources:
+      - adilet.zan.kz
+      - kgk.gov.kz
+      - internal_docs
+
+code_scanning:
+  tools:
+    semgrep:
+      enabled: true
+      rules_path: "./rules/semgrep"
+      target_languages:
+        - python
+        - javascript
+        - java
+        - go
+        - rust
+        
+    codeql:
+      enabled: true
+      databases_path: "./codeql_dbs"
+      languages:
+        - python
+        - javascript
+        
+    bandit:
+      enabled: true
+      rules:
+        - pdp_violations
+        - crypto_compliance
+        
+    llm_review:
+      enabled: true
+      trigger_conditions:
+        - critical_changes
+        - high_risk_pr
+        - pdp_handling
+        
+  output:
+    format: "json"
+    dashboard: "integrated"
+    severity_threshold: "medium"
+
+security:
+  # Kazakhstan-specific compliance
+  compliance:
+    pdp_law: true      # Personal Data Protection Law of RK
+    knb_standards: true # KNB information security standards
+    
+  audit:
+    log_all_requests: true
+    audit_log_path: "./logs/audit.log"
+    retention_days: 365

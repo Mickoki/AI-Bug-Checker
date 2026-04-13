@@ -1,0 +1,29 @@
+# Kazakhstan Security Agent System
+
+## Requirements for the security agent system based on Kazakhstan regulations.
+
+## Core Framework
+langgraph>=0.2.0
+langchain>=0.3.0
+langchain-core>=0.3.0
+crewai>=0.80.0
+
+## Local LLM
+openai>=1.0.0  # For local API compatibility
+
+## Knowledge Base
+psycopg2-binary>=2.9.0
+numpy>=1.24.0
+
+## Code Scanning
+semgrep>=1.0.0
+bandit>=1.7.0
+# CodeQL - separately installed
+
+## Utilities
+pyyaml>=6.0
+python-dotenv>=1.0.0
+requests>=2.31.0
+
+## Monitoring
+prometheus-client>=0.19.0
